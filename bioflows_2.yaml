@@ -1,0 +1,97 @@
+bioproject: PRJNA526716
+experiment: corinne_test
+sample_manifest: 
+  fastq_file: /users/cperlosk/data/SRP188226/manifest_file
+# sra:
+   # id: SRP188226
+   # entrez_email: corinne_perloski@brown.edu
+   # downloads: True
+run_parms:
+  conda_command: source /gpfs/runtime/cbc_conda/bin/activate_cbc_conda
+  work_dir: /users/cperlosk/data/SRP188226
+  log_dir: logs
+  paired_end: False
+  local_targets: False
+  saga_host: localhost
+  ssh_user: cperlosk
+  saga_scheduler: slurm
+workflow_sequence:
+  - fastqc: default
+  - trimmomatic:
+      subcommand: SE
+      options: 
+        "ILLUMINACLIP:/gpfs/data/cbc/cbc_conda_v1/envs/cbc_conda/opt/trimmomatic-0.35/adapters/TruSeq3-SE.fa:2:30:5":
+        "SLIDINGWINDOW:10:25 MINLEN:50":
+      job_params:
+       ncpus: 8
+       mem: 40000
+       time: 600
+  - fastqc:
+      suffix:
+        input: "_tr.fq.gz"
+  - fastq_screen:
+      suffix:
+        input: "_tr.fq.gz"
+      options:
+        --conf: /users/cperlosk/data/SRP188226/config_test_1.txt
+      job_params:
+        ncpus: 4
+        mem: 80000
+        time: 1940
+  - gsnap:
+      suffix:
+        input: "_tr.fq.gz"
+      options:
+       -d: Ensembl_mus_GRCm38.p5_rel89
+       -s: /gpfs/runtime/cbc_conda/cbc_conda_v1_root/envs/cbc_conda_v1/gmapdb_2017.01.14/Ensembl_mus_GRCm38.p5_rel89/Ensembl_mus_GRCm38.p5_rel89.maps/Mus_musculus.GRCm38.89.splicesites.iit
+      job_params:
+        ncpus: 16
+        mem: 160000
+        time: 600
+  - samtools:
+      subcommand: view
+      suffix:
+        input: ".sam"
+        output: ".bam"
+      options:
+        -Sbh:
+      job_params:
+        time: 300
+  - samtools:
+      subcommand: view
+      suffix:
+        input: ".bam"
+        output: ".mapped.bam"
+      options:
+        -bh:
+        -F: "0x4"
+      job_params:
+        time: 300
+  - samtools:
+      subcommand: view
+      suffix:
+        input: ".bam"
+        output: ".unmapped.bam"
+      options:
+        -bh:
+        -f: "0x4"
+      job_params:
+        time: 300
+  - samtools:
+      subcommand: sort
+      suffix:
+        input: ".mapped.bam"
+      job_params:
+        time: 300        
+  - samtools:
+      subcommand: index
+      suffix:
+        input: ".srtd.bam"
+      job_params:
+        time: 300
+  - qualimap:
+      subcommand: rnaseq
+      suffix:
+        input: ".srtd.bam"
+      options:
+        -gtf: /gpfs/data/shared/databases/refchef_refs/grcm38_p5/gtf/Mus_musculus.GRCm38.89.gtf 
